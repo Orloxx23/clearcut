@@ -23,11 +23,10 @@ export TORCH_HOME="$CACHE_ROOT/torch"
 export HF_HOME="$CACHE_ROOT/huggingface"
 mkdir -p "$TORCH_HOME" "$HF_HOME"
 
-echo "==> [1/6] Dependencias del sistema (ffmpeg, git)"
-if ! command -v ffmpeg >/dev/null 2>&1; then
-  apt-get update -y
-  apt-get install -y --no-install-recommends ffmpeg git curl ca-certificates
-fi
+echo "==> [1/6] Dependencias del sistema (ffmpeg, git, curl)"
+# apt-get install es idempotente: si ya están, no hace nada costoso.
+apt-get update -y
+apt-get install -y --no-install-recommends ffmpeg git curl ca-certificates
 
 echo "==> [2/6] Node.js + pnpm (para compilar el frontend)"
 if ! command -v node >/dev/null 2>&1; then
