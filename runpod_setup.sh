@@ -36,8 +36,12 @@ fi
 command -v pnpm >/dev/null 2>&1 || npm install -g pnpm@10
 
 echo "==> [3/6] Dependencias Python del backend (torch ya viene en la plantilla)"
-# Marcador para no reinstalar en cada arranque.
-if [ ! -f "$CACHE_ROOT/.deps_ok" ]; then
+# Comprobamos importabilidad REAL en vez de un marcador: los paquetes pip se
+# instalan en el sistema del pod (no en /workspace), así que al recrear el pod
+# hay que reinstalarlos aunque el volumen persistente exista.
+if python -c "import fastapi, uvicorn, cv2, faster_whisper, simple_lama_inpainting, av, scipy, skimage, timm" >/dev/null 2>&1; then
+  echo "    (ya instaladas)"
+else
   pip install --no-cache-dir \
     fastapi==0.115.6 "uvicorn[standard]==0.34.0" python-multipart==0.0.20 \
     opencv-python-headless==4.11.0.86 Pillow \
@@ -45,9 +49,6 @@ if [ ! -f "$CACHE_ROOT/.deps_ok" ]; then
     av addict einops future scipy matplotlib scikit-image imageio-ffmpeg pyyaml requests timm yapf
   pip install --no-cache-dir --no-deps simple-lama-inpainting
   pip install --no-cache-dir fire
-  touch "$CACHE_ROOT/.deps_ok"
-else
-  echo "    (ya instaladas)"
 fi
 
 echo "==> [4/6] ProPainter (clonar + parche de progreso)"
