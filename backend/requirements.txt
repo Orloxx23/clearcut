@@ -1,0 +1,38 @@
+# --- API y procesamiento base (modo rápido) ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+opencv-python-headless==4.11.0.86
+Pillow
+
+# --- Alta calidad (IA) ---
+# IMPORTANTE: instala PyTorch con CUDA ANTES que el resto, o se instalará la
+# build CPU y la IA correrá lentísima. Para CUDA 12.4:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+torch
+torchvision
+
+# LaMa (imágenes). Instalar con --no-deps para no degradar opencv/numpy/torch:
+#   pip install --no-deps simple-lama-inpainting && pip install fire
+simple-lama-inpainting
+fire
+
+# Subtítulos: transcripción de audio con Whisper (faster-whisper usa CTranslate2,
+# aprovecha la build CUDA de torch ya instalada). Modelo large-v3 (~3 GB).
+faster-whisper
+
+# ProPainter (video) — NO es pip, se clona el repo en third_party/ProPainter.
+# Sus dependencias (sin torch ni opencv-python, ya cubiertos arriba):
+av
+addict
+einops
+future
+numpy
+scipy
+matplotlib
+scikit-image
+imageio-ffmpeg
+pyyaml
+requests
+timm
+yapf

@@ -1,0 +1,36 @@
+# ===== Python / backend =====
+backend/venv/
+**/__pycache__/
+*.py[cod]
+backend/uploads/*
+backend/outputs/*
+!backend/uploads/.gitkeep
+!backend/outputs/.gitkeep
+# ProPainter se clona en el setup/build (pesos grandes)
+backend/third_party/
+# Frontend estático copiado en el build (artefacto, no fuente)
+backend/frontend_static/
+# Cachés de modelos del script de RunPod
+.cache/
+*.clearcut-cache/
+
+# ===== Node / frontend =====
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+next-env.d.ts
+*.tsbuildinfo
+
+# ===== Entornos / secretos =====
+.env
+.env.*
+!.env.example
+
+# ===== Sistema operativo / editor =====
+.DS_Store
+Thumbs.db
+*.log
+
+# ===== Temporales de prueba =====
+scratch_*

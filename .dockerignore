@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# Python
+backend/venv
+**/__pycache__
+**/*.pyc
+backend/uploads/*
+backend/outputs/*
+backend/third_party
+
+# Node / Next
+frontend/node_modules
+frontend/.next
+frontend/out
+frontend/.env.local
+
+# Docs y misc
+README.md
+DEPLOY_RUNPOD.md
+*.md
+scratch_*

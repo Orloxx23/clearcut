@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+uploads/*
+outputs/*
+!uploads/.gitkeep
+!outputs/.gitkeep
+# ProPainter se clona aparte (ver README); sus pesos son grandes.
+third_party/
+# Frontend estático copiado en el build de Docker (artefacto, no fuente).
+frontend_static/
