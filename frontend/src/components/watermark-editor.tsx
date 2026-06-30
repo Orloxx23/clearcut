@@ -27,6 +27,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { RegionOverlay } from "@/components/region-overlay";
+import { CompareSlider } from "@/components/compare-slider";
 import {
   detectRegions,
   getCapabilities,
@@ -249,41 +250,69 @@ export function WatermarkEditor() {
       {/* Lienzo */}
       <div className="space-y-4">
         <Card className="overflow-hidden p-0">
-          {/* Contenedor acotado: la media nunca supera el 65% de la altura de la ventana */}
           <div className="flex max-h-[65vh] items-center justify-center bg-[repeating-conic-gradient(#0001_0%_25%,transparent_0%_50%)] [background-size:24px_24px] p-2">
-            <div className="relative inline-block max-h-[calc(65vh-1rem)]">
-              {media.kind === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={media.url}
-                  alt="media"
-                  className="block max-h-[calc(65vh-1rem)] w-auto object-contain"
-                  draggable={false}
+            {resultUrl ? (
+              /* Comparador antes/después sobre el mismo lienzo */
+              <CompareSlider beforeUrl={media.url} afterUrl={resultUrl} kind={media.kind} />
+            ) : (
+              <div className="relative inline-block max-h-[calc(65vh-1rem)]">
+                {media.kind === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={media.url}
+                    alt="media"
+                    className="block max-h-[calc(65vh-1rem)] w-auto object-contain"
+                    draggable={false}
+                  />
+                ) : (
+                  <video
+                    src={media.url}
+                    className="block max-h-[calc(65vh-1rem)] w-auto object-contain"
+                    controls={false}
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                  />
+                )}
+                <RegionOverlay
+                  naturalWidth={media.naturalWidth}
+                  naturalHeight={media.naturalHeight}
+                  regions={regions}
+                  onChange={setRegions}
+                  disabled={busy}
                 />
-              ) : (
-                <video
-                  src={media.url}
-                  className="block max-h-[calc(65vh-1rem)] w-auto object-contain"
-                  controls={false}
-                  muted
-                  loop
-                  autoPlay
-                  playsInline
-                />
-              )}
-              <RegionOverlay
-                naturalWidth={media.naturalWidth}
-                naturalHeight={media.naturalHeight}
-                regions={regions}
-                onChange={setRegions}
-                disabled={busy}
-              />
-            </div>
+              </div>
+            )}
           </div>
         </Card>
-        <p className="text-center text-sm text-muted-foreground">
-          Dibuja un rectángulo sobre cada marca de agua. Pasa el cursor sobre una región para eliminarla.
-        </p>
+
+        {resultUrl ? (
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-center text-sm text-muted-foreground">
+              Arrastra la barra para comparar el antes y el después.
+            </p>
+            <div className="flex w-full gap-2">
+              <a
+                className="flex-1"
+                href={resultUrl}
+                download={media.kind === "image" ? "resultado.png" : "resultado.mp4"}
+              >
+                <Button className="w-full">
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar resultado
+                </Button>
+              </a>
+              <Button variant="outline" onClick={() => setResultUrl(null)}>
+                Volver a editar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-center text-sm text-muted-foreground">
+            Dibuja un rectángulo sobre cada marca de agua. Pasa el cursor sobre una región para eliminarla.
+          </p>
+        )}
 
         {/* Barra de progreso (video) */}
         {busy && media.kind === "video" && (
@@ -305,30 +334,6 @@ export function WatermarkEditor() {
               {eta != null && eta > 0 ? `Tiempo restante ${formatTime(eta)}` : "Estimando tiempo…"}
               {" · "}El video se procesa con IA en la GPU; puede tardar unos minutos.
             </p>
-          </Card>
-        )}
-
-        {/* Resultado */}
-        {resultUrl && (
-          <Card className="p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-emerald-500" />
-              <h3 className="font-medium">Resultado</h3>
-            </div>
-            <div className="flex max-h-[65vh] justify-center overflow-hidden rounded-lg bg-muted/40">
-              {media.kind === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={resultUrl} alt="resultado" className="max-h-[60vh] w-auto object-contain" />
-              ) : (
-                <video src={resultUrl} className="max-h-[60vh] w-auto object-contain" controls autoPlay loop muted />
-              )}
-            </div>
-            <a href={resultUrl} download={media.kind === "image" ? "resultado.png" : "resultado.mp4"}>
-              <Button className="mt-3 w-full">
-                <Download className="mr-2 h-4 w-4" />
-                Descargar resultado
-              </Button>
-            </a>
           </Card>
         )}
       </div>
