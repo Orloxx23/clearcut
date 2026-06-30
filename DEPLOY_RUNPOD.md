@@ -111,6 +111,38 @@ cd /workspace/clearcut && export CLEARCUT_CACHE=/workspace/.clearcut-cache && ba
 > El script es idempotente: salta lo ya instalado. Para forzar recompilar el frontend
 > tras cambios, usa `REBUILD_FRONTEND=1 bash runpod_setup.sh`.
 
+## 4. Arranque automático al encender el pod
+
+Para que el servicio se levante solo cada vez que enciendes la máquina (sin entrar a
+la terminal), usa el **Container Start Command** del pod con el script
+[`runpod_start.sh`](runpod_start.sh).
+
+En **Edit Pod → Container Start Command** pega:
+
+```
+bash -c "[ -d /workspace/clearcut ] || git clone https://github.com/Orloxx23/clearcut /workspace/clearcut; cd /workspace/clearcut && git pull || true; bash runpod_start.sh"
+```
+
+Qué hace en cada arranque:
+1. Clona el repo si falta (primer arranque) y hace `git pull`.
+2. Lanza `runpod_setup.sh` en **segundo plano** (instala lo que falte, arranca el server).
+3. Mantiene el arranque base de la plantilla (SSH/terminal) en primer plano.
+
+El log del servicio queda en `/workspace/clearcut.log`:
+
+```bash
+tail -f /workspace/clearcut.log   # ver el arranque en vivo
+```
+
+> **GPU Blackwell** (RTX PRO 6000, 5090): usa la plantilla **PyTorch 2.8** (CUDA 12.8).
+> Las de CUDA 12.4 (PyTorch 2.4) no traen kernels para Blackwell y fallan al procesar.
+> Para Ada/Ampere (4090, A5000…) la PyTorch 2.4 va perfecta.
+
+> **Nota**: con un Container Start Command custom, el primer arranque tras encender
+> tarda lo que tarde el setup (rápido si el volumen ya tiene deps/modelos cacheados).
+> Para un auto-arranque instantáneo y 100% reproducible, considera la **Opción A**
+> (imagen Docker propia): su `CMD` levanta el server nativo sin scripts.
+
 ---
 
 ## Variables de entorno (opcionales)
