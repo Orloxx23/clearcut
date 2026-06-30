@@ -63,6 +63,45 @@ export async function getSubtitleStatus(jobId: string): Promise<SubtitleStatus> 
   return res.json();
 }
 
+// ----------------------------- Almacenamiento -----------------------------
+
+export interface StorageItem {
+  job_id: string;
+  size_bytes: number;
+  modified: number; // epoch seconds
+  download_url: string;
+}
+
+export interface StorageInfo {
+  items: StorageItem[];
+  total_bytes: number;
+}
+
+/** Lista los videos procesados guardados en el servidor. */
+export async function getStorage(): Promise<StorageInfo> {
+  const res = await fetch(`${API_URL}/api/storage`);
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+/** Borra un video procesado concreto. */
+export async function deleteStorageItem(jobId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/storage/${jobId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await readError(res));
+}
+
+/** Borra todos los videos procesados (y uploads huérfanos). */
+export async function clearStorage(): Promise<{ deleted: number; freed_bytes: number }> {
+  const res = await fetch(`${API_URL}/api/storage`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+/** URL absoluta de descarga (para enlaces directos). */
+export function absoluteUrl(path: string): string {
+  return `${API_URL}${path}`;
+}
+
 /** Consulta qué modos de alta calidad (IA) están disponibles en el servidor. */
 export async function getCapabilities(): Promise<Capabilities> {
   const res = await fetch(`${API_URL}/api/capabilities`);

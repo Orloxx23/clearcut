@@ -329,6 +329,55 @@ async def subtitle_status(job_id: str) -> dict:
     return out
 
 
+# ----------------------------- Almacenamiento -----------------------------
+
+@app.get("/api/storage")
+async def list_storage() -> dict:
+    """Lista los videos procesados guardados en disco (los que se acumulan)."""
+    items = []
+    total = 0
+    for f in sorted(OUTPUT_DIR.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
+        st = f.stat()
+        total += st.st_size
+        items.append({
+            "job_id": f.stem,
+            "size_bytes": st.st_size,
+            "modified": st.st_mtime,
+            "download_url": f"/api/video/download/{f.stem}",
+        })
+    return {"items": items, "total_bytes": total}
+
+
+@app.delete("/api/storage/{job_id}")
+async def delete_storage_item(job_id: str) -> dict:
+    """Borra un video procesado concreto."""
+    if not job_id.isalnum():
+        raise HTTPException(status_code=400, detail="job_id inválido.")
+    path = OUTPUT_DIR / f"{job_id}.mp4"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Archivo no encontrado.")
+    freed = path.stat().st_size
+    path.unlink()
+    return {"deleted": job_id, "freed_bytes": freed}
+
+
+@app.delete("/api/storage")
+async def clear_storage() -> dict:
+    """Borra todos los videos procesados y los archivos subidos huérfanos."""
+    count = 0
+    freed = 0
+    for f in OUTPUT_DIR.glob("*.mp4"):
+        freed += f.stat().st_size
+        f.unlink(missing_ok=True)
+        count += 1
+    # Uploads huérfanos (normalmente se borran solos, pero por si quedó alguno).
+    for f in UPLOAD_DIR.iterdir():
+        if f.is_file() and f.name != ".gitkeep":
+            freed += f.stat().st_size
+            f.unlink(missing_ok=True)
+    return {"deleted": count, "freed_bytes": freed}
+
+
 # ----------------------- Frontend estático (despliegue todo-en-uno) -----------------------
 # Se monta al final, después de todas las rutas /api, para que estas tengan prioridad.
 # La ruta del build del frontend se configura con FRONTEND_DIR (por defecto, junto al backend).

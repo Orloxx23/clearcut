@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { StorageDialog } from "@/components/storage-dialog";
 import { Sparkles } from "lucide-react";
 
 const geistSans = Geist({
@@ -40,7 +41,10 @@ export default function RootLayout({
                 </div>
                 <span className="text-lg font-semibold tracking-tight">Clearcut</span>
               </div>
-              <ThemeToggle />
+              <div className="flex items-center gap-1">
+                <StorageDialog />
+                <ThemeToggle />
+              </div>
             </div>
           </header>
 
