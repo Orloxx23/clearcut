@@ -158,9 +158,15 @@ def _write_mask(regions: list[dict], width: int, height: int, dilation: int, pat
     cv2.imwrite(str(path), mask)
 
 
-# Resolución máxima de procesado para no saturar la VRAM (16 GB).
-# Procesar por encima de ~960px en el lado mayor provoca thrashing y lentitud.
-MAX_PROCESS_DIM = 960
+import os
+
+# Parámetros de ProPainter, ajustables por variables de entorno (sin reconstruir).
+# Bajar estos valores reduce el uso de VRAM (útil en GPUs pequeñas):
+#   PP_MAX_DIM=720 PP_SUBVIDEO=20 PP_NEIGHBOR=4   (más conservador)
+MAX_PROCESS_DIM = int(os.getenv("PP_MAX_DIM", "960"))   # lado mayor máx. de procesado
+PP_SUBVIDEO = os.getenv("PP_SUBVIDEO", "30")            # frames por bloque
+PP_NEIGHBOR = os.getenv("PP_NEIGHBOR", "6")             # frames vecinos
+PP_REF_STRIDE = os.getenv("PP_REF_STRIDE", "20")        # stride de referencias
 
 # Fases de ProPainter, identificadas por su etiqueta PPSTAGE. Cada una tiene un
 # peso aproximado en el progreso total (el flujo óptico RAFT es lo más pesado) y
@@ -222,9 +228,9 @@ async def process_video_hq(
             "--output", str(out_dir),
             "--mask_dilation", "0",        # ya dilatamos la máscara nosotros
             "--fp16",                      # media precisión: menos VRAM
-            "--subvideo_length", "30",     # bloques cortos -> menos memoria, más estable
-            "--neighbor_length", "6",
-            "--ref_stride", "20",
+            "--subvideo_length", PP_SUBVIDEO,
+            "--neighbor_length", PP_NEIGHBOR,
+            "--ref_stride", PP_REF_STRIDE,
         ]
         if resize_ratio < 1.0:
             cmd += ["--resize_ratio", str(resize_ratio)]
@@ -237,14 +243,23 @@ async def process_video_hq(
         )
 
         await emit("Preparando el modelo", 1.0, None)
-        await _consume_progress(proc, emit)
+        tail = await _consume_progress(proc, emit)
 
         rc = await proc.wait()
         if rc != 0:
-            # Releemos lo que quede (ya consumido en _consume_progress vía tail).
+            log_tail = "\n".join(tail)
+            # Imprimimos el log real al stderr del servidor para diagnóstico.
+            print(f"[ProPainter] salida (rc={rc}):\n{log_tail}", flush=True)
+            low = log_tail.lower()
+            if "out of memory" in low or "cuda error" in low or "cublas" in low:
+                raise RuntimeError(
+                    "La GPU se quedó sin memoria procesando el video. Prueba con un video "
+                    "más corto/pequeño, o baja los parámetros (variables PP_MAX_DIM, "
+                    "PP_SUBVIDEO, PP_NEIGHBOR)."
+                )
+            # Otro tipo de fallo: incluimos las últimas líneas para poder depurar.
             raise RuntimeError(
-                "La GPU se quedó sin memoria, o ProPainter falló al procesar el "
-                "video. Prueba con un video más corto o de menor resolución."
+                "ProPainter falló al procesar el video. Detalle:\n" + log_tail[-1200:]
             )
 
         # ProPainter escribe en {out_dir}/{nombre_video}/inpaint_out.mp4
@@ -287,15 +302,20 @@ async def _mux_with_original_audio(video_only: Path, original: Path, output_path
         shutil.copyfile(video_only, output_path)
 
 
-async def _consume_progress(proc, emit: Callable[[str, float, float | None], Awaitable[None]]) -> None:
+async def _consume_progress(proc, emit: Callable[[str, float, float | None], Awaitable[None]]) -> list[str]:
     """Lee el stdout de ProPainter en vivo y traduce las barras tqdm a progreso global.
 
     tqdm reescribe la misma línea con '\\r', así que leemos por chunks y separamos
     por '\\r' y '\\n'. Cada barra trae su etiqueta de fase (PPSTAGE:xxx), con la que
     componemos un progreso global ponderado.
+
+    Devuelve las últimas líneas de salida (para diagnóstico si el proceso falla).
     """
+    from collections import deque
+
     current_key = "flow"   # primera fase por defecto
     buf = b""
+    tail: deque[str] = deque(maxlen=40)  # conservamos las últimas líneas no-tqdm
 
     while True:
         chunk = await proc.stdout.read(256)
@@ -310,6 +330,7 @@ async def _consume_progress(proc, emit: Callable[[str, float, float | None], Awa
                 continue
             m = _TQDM_RE.search(line)
             if not m:
+                tail.append(line)  # líneas de log/error (no barras de progreso)
                 continue
             key = m.group(1)
             pct_in_stage = float(m.group(2))
@@ -320,3 +341,7 @@ async def _consume_progress(proc, emit: Callable[[str, float, float | None], Awa
             label, weight = _STAGE_INFO.get(current_key, ("Procesando", 1.0))
             global_pct = _stage_offset(current_key) + pct_in_stage * weight
             await emit(label, global_pct, eta_stage)
+
+    if buf.strip():
+        tail.append(buf.decode("utf-8", errors="replace").strip())
+    return list(tail)
