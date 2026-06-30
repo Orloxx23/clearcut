@@ -62,14 +62,27 @@ echo "==> [5/6] Pre-descarga de modelos (LaMa, Whisper, ProPainter)"
 python scripts/download_models.py
 
 echo "==> [6/6] Compilar el frontend (estático) y dejarlo listo para el backend"
-if [ ! -d frontend_static ] || [ "${REBUILD_FRONTEND:-0}" = "1" ]; then
+STATIC_DIR="$APP_DIR/backend/frontend_static"
+BUILD_MARKER="$STATIC_DIR/.build_commit"
+CURRENT_COMMIT="$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null || echo nogit)"
+
+# Recompilar si: no hay build, se fuerza, o el commit cambió desde el último build.
+NEED_BUILD=0
+[ ! -d "$STATIC_DIR" ] && NEED_BUILD=1
+[ "${REBUILD_FRONTEND:-0}" = "1" ] && NEED_BUILD=1
+[ ! -f "$BUILD_MARKER" ] && NEED_BUILD=1
+[ -f "$BUILD_MARKER" ] && [ "$(cat "$BUILD_MARKER" 2>/dev/null)" != "$CURRENT_COMMIT" ] && NEED_BUILD=1
+
+if [ "$NEED_BUILD" = "1" ]; then
+  echo "    Compilando frontend (commit $CURRENT_COMMIT)…"
   cd "$APP_DIR/frontend"
   pnpm install --frozen-lockfile
   NEXT_PUBLIC_API_URL="" pnpm build
-  rm -rf "$APP_DIR/backend/frontend_static"
-  cp -r out "$APP_DIR/backend/frontend_static"
+  rm -rf "$STATIC_DIR"
+  cp -r out "$STATIC_DIR"
+  echo "$CURRENT_COMMIT" > "$BUILD_MARKER"
 else
-  echo "    (frontend ya compilado; usa REBUILD_FRONTEND=1 para forzar)"
+  echo "    (frontend al día; commit $CURRENT_COMMIT)"
 fi
 
 echo "==> Arrancando servidor en 0.0.0.0:${PORT:-8000}"
