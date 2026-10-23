@@ -1,15 +1,43 @@
-"""Aplica al script de inferencia de ProPainter las etiquetas de progreso (tqdm
-con desc 'PPSTAGE:...') que el backend parsea para mostrar la barra de progreso.
+"""Aplica al script de inferencia de ProPainter:
+
+- Las etiquetas de progreso (tqdm con desc 'PPSTAGE:...') que el backend parsea para
+  mostrar la barra de progreso.
+- La lectura del video con OpenCV en vez de torchvision.io.read_video, que falla con
+  PyAV >= 14 ("open() got an unexpected keyword argument 'metadata_errors'").
 
 Es idempotente: si ya está parcheado, no hace nada. Se ejecuta en el build de Docker
-tras clonar el repo de ProPainter.
+y en runpod_setup.sh tras clonar el repo de ProPainter.
 """
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# (texto_original, texto_parcheado) para cada uno de los 4 bucles de fase.
+# Lectura del video con OpenCV. Sin autorrotación, como torchvision: así los
+# fotogramas tienen las mismas dimensiones que da ffprobe, con las que el backend
+# genera la máscara. fps=0 (contenedor sin dato) cae al --save_fps del script.
+READ_VIDEO_ORIGINAL = """\
+        vframes, aframes, info = torchvision.io.read_video(filename=frame_root, pts_unit='sec') # RGB
+        frames = list(vframes.numpy())
+        frames = [Image.fromarray(f) for f in frames]
+        fps = info['video_fps']
+"""
+READ_VIDEO_PATCHED = """\
+        cap = cv2.VideoCapture(frame_root)
+        cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
+        fps = cap.get(cv2.CAP_PROP_FPS) or None
+        frames = []
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            frames.append(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+        cap.release()
+        if not frames:
+            raise RuntimeError(f'No se pudo leer ningún fotograma de {frame_root}')
+"""
+
+# (texto_original, texto_parcheado): los 4 bucles de fase y la lectura del video.
 REPLACEMENTS = [
     (
         "for f in range(0, video_length, short_clip_len):",
@@ -27,6 +55,7 @@ REPLACEMENTS = [
         "for f in tqdm(range(0, video_length, neighbor_stride)):",
         "for f in tqdm(range(0, video_length, neighbor_stride), desc='PPSTAGE:inpaint'):",
     ),
+    (READ_VIDEO_ORIGINAL, READ_VIDEO_PATCHED),
 ]
 
 
@@ -49,7 +78,7 @@ def main(script_path: str) -> int:
 
     if changed:
         path.write_text(text, encoding="utf-8")
-    print(f"[patch_propainter] {changed} bucle(s) parcheado(s).")
+    print(f"[patch_propainter] {changed} cambio(s) aplicado(s).")
     return 0
 
 
